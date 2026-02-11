@@ -1,0 +1,20 @@
+# Règles de développement du projet
+
+## 1. Principes d'Architecture (DRY & Clean Code)
+- **Interdiction de duplication :** Si une logique de gestion d'erreur ou de mapping est répétée plus de 2 fois, elle DOIT être extraite dans un middleware, un utilitaire ou un service de base.
+- **Gestion des erreurs :** Utilise systématiquement le middleware global `errorHandler` et le wrapper `asyncHandler`. Ne jamais écrire de blocs `try/catch` vides ou génériques dans les routes.
+- **Modularité :** Les fichiers de routes ne doivent contenir que la définition des endpoints. La logique métier doit être dans les services.
+
+## 2. Standards de Code
+- **Types :** TypeScript strict est obligatoire. Évite les `any`. Chaque réponse d'API doit avoir une interface définie.
+- **Formatage :** Respecte la configuration Prettier/ESLint existante.
+- **Services :** Pour les services comme ChromaDB, centralise les constantes (noms de collections, messages d'erreurs) en haut de fichier ou dans un fichier de config.
+
+## 3. Stratégie de Tests (Crucial)
+- **Nouveau Code :** Toute nouvelle fonctionnalité ou refactoring de logique métier doit être accompagné d'un fichier de test `.test.ts`.
+- **Outil :** Utilise Vitest pour les tests unitaires.
+- **Priorité :** Focus sur les tests de mapping et les cas limites (données manquantes, erreurs de base de données).
+
+## 4. Instructions de Refactoring
+- Avant de modifier un fichier, vérifie si des fonctions similaires existent ailleurs pour éviter la duplication détectée précédemment dans `document-routes.ts` et `chroma-service.ts`.
+- Si tu modifies une fonction existante, mets à jour les tests correspondants.

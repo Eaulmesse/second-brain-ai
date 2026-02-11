@@ -1,10 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-
-export interface AppError extends Error {
-  code?: string;
-  statusCode?: number;
-  details?: any;
-}
+import { AppError } from './async-handler.js';
 
 export function setupErrorHandler(fastify: FastifyInstance) {
   fastify.setErrorHandler((error: AppError, request: FastifyRequest, reply: FastifyReply) => {

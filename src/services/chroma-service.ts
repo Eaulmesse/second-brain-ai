@@ -1,6 +1,41 @@
 import { ChromaClient, IncludeEnum } from 'chromadb';
 import { LocalEmbeddings } from './local-embeddings.js';
 
+const DEFAULT_CONFIG = {
+  CHROMA_HOST: 'localhost',
+  CHROMA_PORT: '8000',
+  CHROMA_COLLECTION_NAME: 'documents',
+  EMBEDDING_DIMENSION: 384,
+} as const;
+
+const ERROR_MESSAGES = {
+  INITIALIZATION_FAILED: 'ChromaDB initialization failed',
+  ADD_DOCUMENTS_FAILED: 'Failed to add documents',
+  SEARCH_FAILED: 'Search failed',
+  GET_DOCUMENT_FAILED: 'Failed to get document',
+  UPDATE_DOCUMENT_FAILED: 'Failed to update document',
+  DELETE_DOCUMENT_FAILED: 'Failed to delete document',
+  DELETE_DOCUMENTS_FAILED: 'Failed to delete documents',
+  LIST_DOCUMENTS_FAILED: 'Failed to list documents',
+  GET_STATS_FAILED: 'Failed to get collection stats',
+  CLEAR_COLLECTION_FAILED: 'Failed to clear collection',
+} as const;
+
+const COLLECTION_METADATA = {
+  description: 'Document embeddings for second-brain',
+} as const;
+
+const LOG_MESSAGES = {
+  CONNECTION_SUCCESSFUL: 'ChromaDB connection successful',
+  COLLECTION_CREATED: (name: string) => `Created collection: ${name}`,
+  COLLECTION_EXISTS: (name: string) => `Using existing collection: ${name}`,
+  DOCUMENTS_ADDED: (count: number) => `Added ${count} documents to collection`,
+  DOCUMENT_UPDATED: (id: string) => `Updated document: ${id}`,
+  DOCUMENT_DELETED: (id: string) => `Deleted document: ${id}`,
+  DOCUMENTS_DELETED: (count: number) => `Deleted ${count} documents`,
+  COLLECTION_CLEARED: (name: string) => `Cleared collection: ${name}`,
+} as const;
+
 export interface VectorDocument {
   id: string;
   content: string;
@@ -27,15 +62,15 @@ export class ChromaService {
   private initializationPromise: Promise<void> | null = null;
 
   constructor() {
-    const host = process.env['CHROMA_HOST'] || 'localhost';
-    const port = process.env['CHROMA_PORT'] || '8000';
-    this.collectionName = process.env['CHROMA_COLLECTION_NAME'] || 'documents';
+    const host = process.env['CHROMA_HOST'] || DEFAULT_CONFIG.CHROMA_HOST;
+    const port = process.env['CHROMA_PORT'] || DEFAULT_CONFIG.CHROMA_PORT;
+    this.collectionName = process.env['CHROMA_COLLECTION_NAME'] || DEFAULT_CONFIG.CHROMA_COLLECTION_NAME;
 
     this.client = new ChromaClient({
       path: `http://${host}:${port}`,
     });
 
-    this.embeddings = new LocalEmbeddings(384);
+    this.embeddings = new LocalEmbeddings(DEFAULT_CONFIG.EMBEDDING_DIMENSION);
   }
 
   private async ensureInitialized(): Promise<void> {
@@ -60,7 +95,7 @@ export class ChromaService {
   async initialize(): Promise<void> {
     try {
       await this.client.heartbeat();
-      console.log('ChromaDB connection successful');
+      console.log(LOG_MESSAGES.CONNECTION_SUCCESSFUL);
 
       const collections = await this.client.listCollections();
       const collectionExists = collections.some(c => c === this.collectionName);
@@ -69,19 +104,19 @@ export class ChromaService {
         await this.client.createCollection({
           name: this.collectionName,
           metadata: {
-            description: 'Document embeddings for second-brain',
+            ...COLLECTION_METADATA,
             created: new Date().toISOString(),
           },
         });
-        console.log(`Created collection: ${this.collectionName}`);
+        console.log(LOG_MESSAGES.COLLECTION_CREATED(this.collectionName));
       } else {
-        console.log(`Using existing collection: ${this.collectionName}`);
+        console.log(LOG_MESSAGES.COLLECTION_EXISTS(this.collectionName));
       }
       
       this.initialized = true;
     } catch (error) {
       console.error('Failed to initialize ChromaDB:', error);
-      throw new Error(`ChromaDB initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`${ERROR_MESSAGES.INITIALIZATION_FAILED}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -111,11 +146,11 @@ export class ChromaService {
         documents: contents,
       });
 
-      console.log(`Added ${documents.length} documents to collection`);
+      console.log(LOG_MESSAGES.DOCUMENTS_ADDED(documents.length));
       return ids;
     } catch (error) {
       console.error('Failed to add documents:', error);
-      throw new Error(`Failed to add documents: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`${ERROR_MESSAGES.ADD_DOCUMENTS_FAILED}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -184,7 +219,7 @@ export class ChromaService {
       }).filter((result): result is SearchResult => result !== null);
     } catch (error) {
       console.error('Failed to search documents:', error);
-      throw new Error(`Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`${ERROR_MESSAGES.SEARCH_FAILED}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -220,7 +255,7 @@ export class ChromaService {
       };
     } catch (error) {
       console.error('Failed to get document:', error);
-      throw new Error(`Failed to get document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`${ERROR_MESSAGES.GET_DOCUMENT_FAILED}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -246,10 +281,10 @@ export class ChromaService {
         documents: [content],
       });
 
-      console.log(`Updated document: ${id}`);
+      console.log(LOG_MESSAGES.DOCUMENT_UPDATED(id));
     } catch (error) {
       console.error('Failed to update document:', error);
-      throw new Error(`Failed to update document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`${ERROR_MESSAGES.UPDATE_DOCUMENT_FAILED}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -266,10 +301,10 @@ export class ChromaService {
         },
       });
       await collection.delete({ ids: [id] });
-      console.log(`Deleted document: ${id}`);
+      console.log(LOG_MESSAGES.DOCUMENT_DELETED(id));
     } catch (error) {
       console.error('Failed to delete document:', error);
-      throw new Error(`Failed to delete document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`${ERROR_MESSAGES.DELETE_DOCUMENT_FAILED}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -285,11 +320,11 @@ export class ChromaService {
           },
         },
       });
-      await collection.delete({ ids });
-      console.log(`Deleted ${ids.length} documents`);
+       await collection.delete({ ids });
+      console.log(LOG_MESSAGES.DOCUMENTS_DELETED(ids.length));
     } catch (error) {
       console.error('Failed to delete documents:', error);
-      throw new Error(`Failed to delete documents: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`${ERROR_MESSAGES.DELETE_DOCUMENTS_FAILED}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -329,7 +364,7 @@ export class ChromaService {
         .filter((doc): doc is VectorDocument => doc !== null);
     } catch (error) {
       console.error('Failed to list documents:', error);
-      throw new Error(`Failed to list documents: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`${ERROR_MESSAGES.LIST_DOCUMENTS_FAILED}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -354,7 +389,7 @@ export class ChromaService {
       };
     } catch (error) {
       console.error('Failed to get collection stats:', error);
-      throw new Error(`Failed to get collection stats: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`${ERROR_MESSAGES.GET_STATS_FAILED}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -363,12 +398,12 @@ export class ChromaService {
       await this.ensureInitialized();
       
       await this.client.deleteCollection({ name: this.collectionName });
-      console.log(`Cleared collection: ${this.collectionName}`);
+      console.log(LOG_MESSAGES.COLLECTION_CLEARED(this.collectionName));
       
       await this.client.createCollection({
         name: this.collectionName,
         metadata: {
-          description: 'Document embeddings for second-brain',
+          ...COLLECTION_METADATA,
           created: new Date().toISOString(),
           cleared: new Date().toISOString(),
         },
@@ -378,7 +413,7 @@ export class ChromaService {
       this.initializationPromise = null;
     } catch (error) {
       console.error('Failed to clear collection:', error);
-      throw new Error(`Failed to clear collection: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`${ERROR_MESSAGES.CLEAR_COLLECTION_FAILED}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

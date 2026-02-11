@@ -1,5 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { ChromaService } from '../services/chroma-service.js';
+import { asyncHandler } from '../middleware/async-handler.js';
+import { Errors } from '../utils/errors.js';
 import {
   DocumentSchema,
   DocumentUpdateSchema,
@@ -17,6 +19,16 @@ import {
 export async function documentRoutes(fastify: FastifyInstance) {
   const chromaService = new ChromaService();
 
+  // Helper function to map document to response
+  const mapToResponse = (document: any) => ({
+    id: document.id,
+    content: document.content,
+    metadata: document.metadata,
+    created: document.metadata['timestamp'],
+    updated: document.metadata['updated'],
+  });
+
+  // POST /api/documents - Create a document
   fastify.post('/api/documents', {
     schema: {
       body: DocumentSchema,
@@ -26,46 +38,24 @@ export async function documentRoutes(fastify: FastifyInstance) {
         500: ErrorResponseSchema,
       },
     },
-  }, async (request, reply) => {
-    try {
-      const document = request.body as Document;
-      
-      const id = await chromaService.addDocument(
-        document.content,
-        document.metadata || {}
-      );
-      
-      const createdDocument = await chromaService.getDocument(id);
-      
-      if (!createdDocument) {
-        throw new Error('Failed to retrieve created document');
-      }
-      
-      return reply.code(201).send({
-        id: createdDocument.id,
-        content: createdDocument.content,
-        metadata: createdDocument.metadata,
-        created: createdDocument.metadata['timestamp'],
-      });
-    } catch (error: unknown) {
-      const errorObj = error instanceof Error ? error : new Error('Unknown error');
-      fastify.log.error({
-        msg: 'Create document error',
-        error: errorObj.message,
-        stack: errorObj.stack,
-        timestamp: new Date().toISOString(),
-      });
-      
-      return reply.code(500).send({
-        error: {
-          message: errorObj.message,
-          code: 'DOCUMENT_CREATE_ERROR',
-          details: process.env['NODE_ENV'] === 'development' ? errorObj.stack : undefined,
-        },
-      });
+  }, asyncHandler(async (request, reply) => {
+    const document = request.body as Document;
+    
+    const id = await chromaService.addDocument(
+      document.content,
+      document.metadata || {}
+    );
+    
+    const createdDocument = await chromaService.getDocument(id);
+    
+    if (!createdDocument) {
+      throw Errors.service('Failed to retrieve created document', 'DOCUMENT_RETRIEVAL_ERROR');
     }
-  });
+    
+    return reply.code(201).send(mapToResponse(createdDocument));
+  }));
 
+  // POST /api/documents/batch - Create multiple documents
   fastify.post('/api/documents/batch', {
     schema: {
       body: Type.Array(DocumentSchema),
@@ -77,44 +67,27 @@ export async function documentRoutes(fastify: FastifyInstance) {
         500: ErrorResponseSchema,
       },
     },
-  }, async (request, reply) => {
-    try {
-      const documents = request.body as Document[];
-      
-      const vectorDocuments = documents.map(doc => ({
-        id: doc.id || `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        content: doc.content,
-        metadata: {
-          ...(doc.metadata || {}),
-          timestamp: new Date().toISOString(),
-        },
-      }));
-      
-      const ids = await chromaService.addDocuments(vectorDocuments);
-      
-      return reply.code(201).send({
-        ids,
-        count: ids.length,
-      });
-    } catch (error: unknown) {
-      const errorObj = error instanceof Error ? error : new Error('Unknown error');
-      fastify.log.error({
-        msg: 'Batch create documents error',
-        error: errorObj.message,
-        stack: errorObj.stack,
+  }, asyncHandler(async (request, reply) => {
+    const documents = request.body as Document[];
+    
+    const vectorDocuments = documents.map(doc => ({
+      id: doc.id || `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      content: doc.content,
+      metadata: {
+        ...(doc.metadata || {}),
         timestamp: new Date().toISOString(),
-      });
-      
-      return reply.code(500).send({
-        error: {
-          message: errorObj.message,
-          code: 'BATCH_CREATE_ERROR',
-          details: process.env['NODE_ENV'] === 'development' ? errorObj.stack : undefined,
-        },
-      });
-    }
-  });
+      },
+    }));
+    
+    const ids = await chromaService.addDocuments(vectorDocuments);
+    
+    return reply.code(201).send({
+      ids,
+      count: ids.length,
+    });
+  }));
 
+  // GET /api/documents/:id - Get a document by ID
   fastify.get('/api/documents/:id', {
     schema: {
       params: Type.Object({
@@ -126,46 +99,19 @@ export async function documentRoutes(fastify: FastifyInstance) {
         500: ErrorResponseSchema,
       },
     },
-  }, async (request, reply) => {
-    try {
-      const { id } = request.params as { id: string };
-      
-      const document = await chromaService.getDocument(id);
-      
-      if (!document) {
-        return reply.code(404).send({
-          error: {
-            message: `Document with id ${id} not found`,
-            code: 'DOCUMENT_NOT_FOUND',
-          },
-        });
-      }
-      
-      return reply.code(200).send({
-        id: document.id,
-        content: document.content,
-        metadata: document.metadata,
-        created: document.metadata['timestamp'],
-      });
-    } catch (error: unknown) {
-      const errorObj = error instanceof Error ? error : new Error('Unknown error');
-      fastify.log.error({
-        msg: 'Get document error',
-        error: errorObj.message,
-        stack: errorObj.stack,
-        timestamp: new Date().toISOString(),
-      });
-      
-      return reply.code(500).send({
-        error: {
-          message: errorObj.message,
-          code: 'DOCUMENT_GET_ERROR',
-          details: process.env['NODE_ENV'] === 'development' ? errorObj.stack : undefined,
-        },
-      });
+  }, asyncHandler(async (request, reply) => {
+    const { id } = request.params as { id: string };
+    
+    const document = await chromaService.getDocument(id);
+    
+    if (!document) {
+      throw Errors.documentNotFound(id);
     }
-  });
+    
+    return reply.code(200).send(mapToResponse(document));
+  }));
 
+  // PUT /api/documents/:id - Update a document
   fastify.put('/api/documents/:id', {
     schema: {
       params: Type.Object({
@@ -178,63 +124,35 @@ export async function documentRoutes(fastify: FastifyInstance) {
         500: ErrorResponseSchema,
       },
     },
-  }, async (request, reply) => {
-    try {
-      const { id } = request.params as { id: string };
-      const update = request.body as DocumentUpdate;
-      
-      const existingDocument = await chromaService.getDocument(id);
-      
-      if (!existingDocument) {
-        return reply.code(404).send({
-          error: {
-            message: `Document with id ${id} not found`,
-            code: 'DOCUMENT_NOT_FOUND',
-          },
-        });
-      }
-      
-      const content = update.content || existingDocument.content;
-      const metadata = {
-        ...existingDocument.metadata,
-        ...(update.metadata || {}),
-        updated: new Date().toISOString(),
-      };
-      
-      await chromaService.updateDocument(id, content, metadata);
-      
-      const updatedDocument = await chromaService.getDocument(id);
-      
-      if (!updatedDocument) {
-        throw new Error('Failed to retrieve updated document');
-      }
-      
-      return reply.code(200).send({
-        id: updatedDocument.id,
-        content: updatedDocument.content,
-        metadata: updatedDocument.metadata,
-        created: updatedDocument.metadata['timestamp'],
-        updated: updatedDocument.metadata['updated'],
-      });
-    } catch (error: unknown) {
-      const errorObj = error instanceof Error ? error : new Error('Unknown error');
-      fastify.log.error({
-        msg: 'Update document error',
-        error: errorObj.message,
-        stack: errorObj.stack,
-        timestamp: new Date().toISOString(),
-      });
-      
-      return reply.code(500).send({
-        error: {
-          message: errorObj.message,
-          code: 'DOCUMENT_UPDATE_ERROR',
-          details: process.env['NODE_ENV'] === 'development' ? errorObj.stack : undefined,
-        },
-      });
+  }, asyncHandler(async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const update = request.body as DocumentUpdate;
+    
+    const existingDocument = await chromaService.getDocument(id);
+    
+    if (!existingDocument) {
+      throw Errors.documentNotFound(id);
     }
-  });
+    
+    const content = update.content || existingDocument.content;
+    const metadata = {
+      ...existingDocument.metadata,
+      ...(update.metadata || {}),
+      updated: new Date().toISOString(),
+    };
+    
+    await chromaService.updateDocument(id, content, metadata);
+    
+    const updatedDocument = await chromaService.getDocument(id);
+    
+    if (!updatedDocument) {
+      throw Errors.service('Failed to retrieve updated document', 'DOCUMENT_RETRIEVAL_ERROR');
+    }
+    
+    return reply.code(200).send(mapToResponse(updatedDocument));
+  }));
 
+  // DELETE /api/documents/:id - Delete a document
   fastify.delete('/api/documents/:id', {
     schema: {
       params: Type.Object({
@@ -246,43 +164,21 @@ export async function documentRoutes(fastify: FastifyInstance) {
         500: ErrorResponseSchema,
       },
     },
-  }, async (request, reply) => {
-    try {
-      const { id } = request.params as { id: string };
-      
-      const existingDocument = await chromaService.getDocument(id);
-      
-      if (!existingDocument) {
-        return reply.code(404).send({
-          error: {
-            message: `Document with id ${id} not found`,
-            code: 'DOCUMENT_NOT_FOUND',
-          },
-        });
-      }
-      
-      await chromaService.deleteDocument(id);
-      
-      return reply.code(204).send();
-    } catch (error: unknown) {
-      const errorObj = error instanceof Error ? error : new Error('Unknown error');
-      fastify.log.error({
-        msg: 'Delete document error',
-        error: errorObj.message,
-        stack: errorObj.stack,
-        timestamp: new Date().toISOString(),
-      });
-      
-      return reply.code(500).send({
-        error: {
-          message: errorObj.message,
-          code: 'DOCUMENT_DELETE_ERROR',
-          details: process.env['NODE_ENV'] === 'development' ? errorObj.stack : undefined,
-        },
-      });
+  }, asyncHandler(async (request, reply) => {
+    const { id } = request.params as { id: string };
+    
+    const existingDocument = await chromaService.getDocument(id);
+    
+    if (!existingDocument) {
+      throw Errors.documentNotFound(id);
     }
-  });
+    
+    await chromaService.deleteDocument(id);
+    
+    return reply.code(204).send();
+  }));
 
+  // POST /api/documents/search - Search documents
   fastify.post('/api/documents/search', {
     schema: {
       body: DocumentSearchSchema,
@@ -291,48 +187,26 @@ export async function documentRoutes(fastify: FastifyInstance) {
         500: ErrorResponseSchema,
       },
     },
-  }, async (request, reply) => {
-    try {
-      const search = request.body as DocumentSearch;
-      
-      const results = await chromaService.search(
-        search.query,
-        search.limit || 5,
-        search.filter
-      );
-      
-      return reply.code(200).send({
-        results: results.map(result => ({
-          document: {
-            id: result.document.id,
-            content: result.document.content,
-            metadata: result.document.metadata,
-            created: result.document.metadata['timestamp'],
-          },
-          score: result.score,
-        })),
-        query: search.query,
-        total: results.length,
-      });
-    } catch (error: unknown) {
-      const errorObj = error instanceof Error ? error : new Error('Unknown error');
-      fastify.log.error({
-        msg: 'Search documents error',
-        error: errorObj.message,
-        stack: errorObj.stack,
-        timestamp: new Date().toISOString(),
-      });
-      
-      return reply.code(500).send({
-        error: {
-          message: errorObj.message,
-          code: 'DOCUMENT_SEARCH_ERROR',
-          details: process.env['NODE_ENV'] === 'development' ? errorObj.stack : undefined,
-        },
-      });
-    }
-  });
+  }, asyncHandler(async (request, reply) => {
+    const search = request.body as DocumentSearch;
+    
+    const results = await chromaService.search(
+      search.query,
+      search.limit || 5,
+      search.filter
+    );
+    
+    return reply.code(200).send({
+      results: results.map(result => ({
+        document: mapToResponse(result.document),
+        score: result.score,
+      })),
+      query: search.query,
+      total: results.length,
+    });
+  }));
 
+  // GET /api/documents - List documents with pagination
   fastify.get('/api/documents', {
     schema: {
       querystring: Type.Object({
@@ -344,43 +218,21 @@ export async function documentRoutes(fastify: FastifyInstance) {
         500: ErrorResponseSchema,
       },
     },
-  }, async (request, reply) => {
-    try {
-      const { limit = 100, offset = 0 } = request.query as { limit?: number; offset?: number };
-      
-      const documents = await chromaService.listDocuments(limit, offset);
-      const stats = await chromaService.getCollectionStats();
-      
-      return reply.code(200).send({
-        documents: documents.map(doc => ({
-          id: doc.id,
-          content: doc.content,
-          metadata: doc.metadata,
-          created: doc.metadata['timestamp'],
-        })),
-        total: stats.count,
-        limit,
-        offset,
-      });
-    } catch (error: unknown) {
-      const errorObj = error instanceof Error ? error : new Error('Unknown error');
-      fastify.log.error({
-        msg: 'List documents error',
-        error: errorObj.message,
-        stack: errorObj.stack,
-        timestamp: new Date().toISOString(),
-      });
-      
-      return reply.code(500).send({
-        error: {
-          message: errorObj.message,
-          code: 'DOCUMENT_LIST_ERROR',
-          details: process.env['NODE_ENV'] === 'development' ? errorObj.stack : undefined,
-        },
-      });
-    }
-  });
+  }, asyncHandler(async (request, reply) => {
+    const { limit = 100, offset = 0 } = request.query as { limit?: number; offset?: number };
+    
+    const documents = await chromaService.listDocuments(limit, offset);
+    const stats = await chromaService.getCollectionStats();
+    
+    return reply.code(200).send({
+      documents: documents.map(mapToResponse),
+      total: stats.count,
+      limit,
+      offset,
+    });
+  }));
 
+  // GET /api/documents/stats - Get collection statistics
   fastify.get('/api/documents/stats', {
     schema: {
       response: {
@@ -388,30 +240,13 @@ export async function documentRoutes(fastify: FastifyInstance) {
         500: ErrorResponseSchema,
       },
     },
-  }, async (_request, reply) => {
-    try {
-      const stats = await chromaService.getCollectionStats();
-      
-      return reply.code(200).send(stats);
-    } catch (error: unknown) {
-      const errorObj = error instanceof Error ? error : new Error('Unknown error');
-      fastify.log.error({
-        msg: 'Get collection stats error',
-        error: errorObj.message,
-        stack: errorObj.stack,
-        timestamp: new Date().toISOString(),
-      });
-      
-      return reply.code(500).send({
-        error: {
-          message: errorObj.message,
-          code: 'STATS_ERROR',
-          details: process.env['NODE_ENV'] === 'development' ? errorObj.stack : undefined,
-        },
-      });
-    }
-  });
+  }, asyncHandler(async (_request, reply) => {
+    const stats = await chromaService.getCollectionStats();
+    
+    return reply.code(200).send(stats);
+  }));
 
+  // DELETE /api/documents - Clear collection
   fastify.delete('/api/documents', {
     schema: {
       response: {
@@ -419,65 +254,26 @@ export async function documentRoutes(fastify: FastifyInstance) {
         500: ErrorResponseSchema,
       },
     },
-  }, async (_request, reply) => {
-    try {
-      await chromaService.clearCollection();
-      
-      return reply.code(204).send();
-    } catch (error: unknown) {
-      const errorObj = error instanceof Error ? error : new Error('Unknown error');
-      fastify.log.error({
-        msg: 'Clear collection error',
-        error: errorObj.message,
-        stack: errorObj.stack,
-        timestamp: new Date().toISOString(),
-      });
-      
-      return reply.code(500).send({
-        error: {
-          message: errorObj.message,
-          code: 'CLEAR_COLLECTION_ERROR',
-          details: process.env['NODE_ENV'] === 'development' ? errorObj.stack : undefined,
-        },
-      });
-    }
-  });
+  }, asyncHandler(async (_request, reply) => {
+    await chromaService.clearCollection();
+    
+    return reply.code(204).send();
+  }));
 
-  fastify.get('/api/documents/health', async (_request, reply) => {
-    try {
-      const isHealthy = await chromaService.healthCheck();
-      
-      if (isHealthy) {
-        return reply.code(200).send({
-          status: 'healthy',
-          timestamp: new Date().toISOString(),
-          service: 'chromadb',
-        });
-      } else {
-        return reply.code(503).send({
-          status: 'unhealthy',
-          timestamp: new Date().toISOString(),
-          service: 'chromadb',
-          error: 'ChromaDB health check failed',
-        });
-      }
-    } catch (error: unknown) {
-      const errorObj = error instanceof Error ? error : new Error('Unknown error');
-      fastify.log.error({
-        msg: 'ChromaDB health check error',
-        error: errorObj.message,
-        stack: errorObj.stack,
-        timestamp: new Date().toISOString(),
-      });
-      
-      return reply.code(503).send({
-        status: 'unhealthy',
+  // GET /api/documents/health - Health check
+  fastify.get('/api/documents/health', asyncHandler(async (_request, reply) => {
+    const isHealthy = await chromaService.healthCheck();
+    
+    if (isHealthy) {
+      return reply.code(200).send({
+        status: 'healthy',
         timestamp: new Date().toISOString(),
         service: 'chromadb',
-        error: errorObj.message,
       });
+    } else {
+      throw Errors.service('ChromaDB health check failed', 'CHROMADB_HEALTH_CHECK_ERROR');
     }
-  });
+  }));
 }
 
 import { Type } from '@fastify/type-provider-typebox';

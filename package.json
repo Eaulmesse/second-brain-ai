@@ -7,7 +7,11 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsup src/server.ts --format cjs,esm --dts --out-dir dist",
     "start": "node dist/server.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "test:ui": "vitest --ui"
   },
   "keywords": [],
   "author": "",
@@ -28,11 +32,15 @@
     "pdf-parse": "^1.1.1"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.2",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.10.6",
     "@types/pdf-parse": "^1.1.4",
+    "@vitest/ui": "^4.0.18",
+    "happy-dom": "^20.6.1",
     "tsup": "^8.3.6",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.18"
   }
 }
