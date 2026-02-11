@@ -1,0 +1,97 @@
+### Test Health Check
+GET http://localhost:3000/health
+
+### Test Root Endpoint
+GET http://localhost:3000/
+
+### Test Chat Health
+GET http://localhost:3000/api/chat/health
+
+### Test Basic Chat
+POST http://localhost:3000/api/chat
+Content-Type: application/json
+
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is the capital of France?"
+    }
+  ],
+  "model": "deepseek-chat",
+  "temperature": 0.7,
+  "maxTokens": 100
+}
+
+### Test Chat with History
+POST http://localhost:3000/api/chat
+Content-Type: application/json
+
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is the capital of France?"
+    },
+    {
+      "role": "assistant",
+      "content": "The capital of France is Paris."
+    },
+    {
+      "role": "user",
+      "content": "What is its population?"
+    }
+  ],
+  "model": "deepseek-chat",
+  "temperature": 0.3
+}
+
+### Test DeepSeek R1 Reasoning
+POST http://localhost:3000/api/chat
+Content-Type: application/json
+
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "If a train travels at 60 km/h for 2 hours, then at 80 km/h for 1.5 hours, what is the total distance traveled?"
+    }
+  ],
+  "model": "deepseek-reasoner",
+  "temperature": 0.1,
+  "maxTokens": 500
+}
+
+### Test System Message
+POST http://localhost:3000/api/chat
+Content-Type: application/json
+
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful math tutor. Explain concepts step by step."
+    },
+    {
+      "role": "user",
+      "content": "What is the Pythagorean theorem?"
+    }
+  ],
+  "model": "deepseek-chat"
+}
+
+### Test Invalid Request (Missing messages)
+POST http://localhost:3000/api/chat
+Content-Type: application/json
+
+{
+  "model": "deepseek-chat"
+}
+
+### Test Invalid Request (Empty messages)
+POST http://localhost:3000/api/chat
+Content-Type: application/json
+
+{
+  "messages": []
+}

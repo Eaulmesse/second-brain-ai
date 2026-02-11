@@ -1,6 +1,20 @@
 version: '3.8'
 
 services:
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chromadb
+    ports:
+      - "8000:8000"
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - app-network
+    restart: unless-stopped
+
   app:
     build:
       context: .
@@ -11,6 +25,10 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+    depends_on:
+      - chromadb
     restart: unless-stopped
     networks:
       - app-network
@@ -31,9 +49,14 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3000
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
     volumes:
       - ./src:/app/src
       - ./package.json:/app/package.json
+      - ./.env:/app/.env
+    depends_on:
+      - chromadb
     command: npm run dev
     restart: unless-stopped
     networks:
@@ -42,3 +65,6 @@ services:
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  chroma_data:
