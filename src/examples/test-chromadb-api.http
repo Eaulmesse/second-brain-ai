@@ -1,0 +1,150 @@
+### Test ChromaDB Health
+GET http://localhost:3000/api/documents/health
+
+### Test Collection Stats
+GET http://localhost:3000/api/documents/stats
+
+### Test Create Document
+POST http://localhost:3000/api/documents
+Content-Type: application/json
+
+{
+  "content": "The capital of France is Paris. It is located in northern France on the Seine River.",
+  "metadata": {
+    "category": "geography",
+    "language": "en"
+  }
+}
+
+### Test Create Another Document
+POST http://localhost:3000/api/documents
+Content-Type: application/json
+
+{
+  "content": "Machine learning is a subset of artificial intelligence that enables computers to learn from data without being explicitly programmed.",
+  "metadata": {
+    "category": "technology",
+    "language": "en"
+  }
+}
+
+### Test Create Third Document
+POST http://localhost:3000/api/documents
+Content-Type: application/json
+
+{
+  "content": "Quantum computing uses quantum bits (qubits) that can exist in multiple states simultaneously, enabling parallel computation.",
+  "metadata": {
+    "category": "technology",
+    "language": "en"
+  }
+}
+
+### Test Batch Create Documents
+POST http://localhost:3000/api/documents/batch
+Content-Type: application/json
+
+[
+  {
+    "content": "The Eiffel Tower was built for the 1889 World's Fair in Paris.",
+    "metadata": {
+      "category": "history",
+      "language": "en"
+    }
+  },
+  {
+    "content": "Python is a high-level programming language known for its readability and simplicity.",
+    "metadata": {
+      "category": "programming",
+      "language": "en"
+    }
+  }
+]
+
+### Test Get Document by ID
+GET http://localhost:3000/api/documents/{id}
+# Replace {id} with actual document ID from create response
+
+### Test Update Document
+PUT http://localhost:3000/api/documents/{id}
+Content-Type: application/json
+
+{
+  "content": "The capital of France is Paris, which is also known as the City of Light.",
+  "metadata": {
+    "category": "geography",
+    "language": "en",
+    "updated": true
+  }
+}
+
+### Test Search Documents
+POST http://localhost:3000/api/documents/search
+Content-Type: application/json
+
+{
+  "query": "What is the capital of France?",
+  "limit": 3
+}
+
+### Test Search with Filter
+POST http://localhost:3000/api/documents/search
+Content-Type: application/json
+
+{
+  "query": "technology and computing",
+  "limit": 5,
+  "filter": {
+    "category": "technology"
+  }
+}
+
+### Test List Documents
+GET http://localhost:3000/api/documents?limit=10&offset=0
+
+### Test List Documents with Pagination
+GET http://localhost:3000/api/documents?limit=2&offset=0
+
+### Test Delete Document
+DELETE http://localhost:3000/api/documents/{id}
+# Replace {id} with actual document ID
+
+### Test Clear Collection (Dangerous!)
+DELETE http://localhost:3000/api/documents
+
+### Test Invalid Document Creation (Empty content)
+POST http://localhost:3000/api/documents
+Content-Type: application/json
+
+{
+  "content": "",
+  "metadata": {
+    "category": "test"
+  }
+}
+
+### Test Invalid Search (Empty query)
+POST http://localhost:3000/api/documents/search
+Content-Type: application/json
+
+{
+  "query": "",
+  "limit": 5
+}
+
+### Test Get Non-existent Document
+GET http://localhost:3000/api/documents/nonexistent123
+
+### Test Update Non-existent Document
+PUT http://localhost:3000/api/documents/nonexistent123
+Content-Type: application/json
+
+{
+  "content": "This document doesn't exist",
+  "metadata": {
+    "test": true
+  }
+}
+
+### Test Delete Non-existent Document
+DELETE http://localhost:3000/api/documents/nonexistent123

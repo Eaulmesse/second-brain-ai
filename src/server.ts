@@ -1,6 +1,7 @@
 import fastify from 'fastify'
 import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
 import { chatRoutes } from './routes/chat-routes.js'
+import { documentRoutes } from './routes/document-routes.js'
 import { setupErrorHandler } from './middleware/error-handler.js'
 import 'dotenv/config'
 
@@ -10,6 +11,7 @@ const server = fastify({
 
 setupErrorHandler(server)
 server.register(chatRoutes)
+server.register(documentRoutes)
 
 server.get('/health', async () => {
   return { status: 'ok', timestamp: new Date().toISOString() }
