@@ -148,14 +148,46 @@ curl -X POST \
   -F "file=@my-document.pdf"
 ```
 
-### Send a message to chat
+### Send a message to chat (Streaming SSE)
+
+The chat endpoint uses Server-Sent Events (SSE) for streaming responses:
 
 ```bash
 curl -X POST \
   http://localhost:3000/api/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "What does my document contain?"}'
+  -d '{"messages": [{"role": "user", "content": "Hello!"}]}'
 ```
+
+The response will be streamed as SSE events:
+- Each chunk: `data: {"content": "partial response..."}\n\n`
+- End marker: `data: [DONE]\n\n`
+
+### Chat with RAG (Retrieval Augmented Generation)
+
+Enable RAG to search your documents before answering:
+
+```bash
+curl -X POST \
+  http://localhost:3000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [{"role": "user", "content": "What are the key points in my documents?"}],
+    "useRag": true,
+    "ragLimit": 3
+  }'
+```
+
+**RAG Options:**
+- `useRag: true` - Enable document search before answering (default: false)
+- `ragLimit: 3` - Number of documents to retrieve (default: 3, max: 10)
+
+**How RAG works:**
+1. Your question is used to search semantically in your documents
+2. The most relevant documents are retrieved
+3. Document context is added to your prompt
+4. The LLM answers based on the document content
+5. If no relevant documents are found, it responds: "I don't have enough information in your documents to answer this question."
 
 ### Semantic search
 

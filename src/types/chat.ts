@@ -12,6 +12,8 @@ export const ChatRequestSchema = Type.Object({
   temperature: Type.Optional(Type.Number({ minimum: 0, maximum: 2, default: 0.7 })),
   maxTokens: Type.Optional(Type.Number({ minimum: 1, maximum: 4000, default: 1000 })),
   stream: Type.Optional(Type.Boolean({ default: false })),
+  useRag: Type.Optional(Type.Boolean({ default: false, description: 'Enable RAG - search documents before answering' })),
+  ragLimit: Type.Optional(Type.Number({ minimum: 1, maximum: 10, default: 3, description: 'Number of documents to retrieve for RAG' })),
 });
 
 export const ChatResponseSchema = Type.Object({

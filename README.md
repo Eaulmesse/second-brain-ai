@@ -38,6 +38,7 @@ Second Brain is an application that allows you to:
 - **Document upload** with automatic parsing
 - **Document vectorization** for semantic search
 - **Contextual chat** with streaming responses
+- **RAG (Retrieval Augmented Generation)** - Chat based on your documents
 - **Semantic search** across the document database
 - **Health checks** for monitoring
 - **Hot reload** in development
@@ -48,9 +49,10 @@ See [SETUP.md](./SETUP.md) for detailed installation and configuration instructi
 
 ## API Endpoints
 
-### Chat
-- `POST /api/chat` - Send a message and get a response
-- `POST /api/chat/stream` - Stream responses in real-time
+### Chat with RAG (Streaming)
+- `POST /api/chat` - Send a message and receive a streaming response (SSE)
+  - Add `"useRag": true` to search your documents before answering
+  - Add `"ragLimit": 5` to control how many documents to retrieve (default: 3)
 - `GET /api/chat/health` - Check LLM service status
 
 ### Documents
@@ -62,6 +64,25 @@ See [SETUP.md](./SETUP.md) for detailed installation and configuration instructi
 
 ### Health
 - `GET /health` - General application health check
+
+## RAG Usage
+
+Enable RAG to get context-aware answers based on your uploaded documents:
+
+```json
+POST /api/chat
+{
+  "messages": [{"role": "user", "content": "What are the key points in my documents?"}],
+  "useRag": true,
+  "ragLimit": 3
+}
+```
+
+When `useRag` is enabled:
+1. The system searches your documents for relevant context
+2. Retrieved documents are injected into the prompt
+3. The LLM answers based on the document context
+4. If no relevant documents are found, it responds: "I don't have enough information in your documents to answer this question."
 
 ## Architecture
 

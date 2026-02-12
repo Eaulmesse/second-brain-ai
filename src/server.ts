@@ -19,10 +19,9 @@ server.get('/health', async () => {
 
 server.get('/', async () => {
   return { 
-    message: 'Fastify TypeScript API with DeepSeek LLM',
+    message: 'Second Brain API - All chat endpoints use streaming (SSE)',
     endpoints: {
-      chat: 'POST /api/chat',
-      chatStream: 'POST /api/chat/stream',
+      chat: 'POST /api/chat (SSE streaming)',
       chatHealth: 'GET /api/chat/health',
       health: 'GET /health'
     }

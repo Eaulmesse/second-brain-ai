@@ -1,13 +1,12 @@
-import { DeepSeekAgent, DeepSeekR1Agent, type DeepSeekAgentConfig } from '../agents/deepseek-agent.js';
-import { HumanMessage, SystemMessage, AIMessage } from '@langchain/core/messages';
-import { BaseMessage } from '@langchain/core/messages';
+import { DeepSeekAgent, type DeepSeekAgentConfig } from '../agents/deepseek-agent.js';
 import type { ChatRequest, ChatResponse } from '../types/chat.js';
+import { ChromaService } from './chroma-service.js';
 
 export class LLMService {
   private agent: DeepSeekAgent;
-  private r1Agent: DeepSeekR1Agent;
+  private chromaService: ChromaService;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, chromaService?: ChromaService) {
     if (!apiKey) {
       throw new Error('DEEPSEEK_API_KEY is required');
     }
@@ -19,75 +18,50 @@ export class LLMService {
     };
 
     this.agent = new DeepSeekAgent(baseConfig);
-    this.r1Agent = new DeepSeekR1Agent(baseConfig);
+    this.chromaService = chromaService ?? new ChromaService();
   }
 
-  private mapToLangChainMessages(messages: Array<{ role: string; content: string }>): BaseMessage[] {
-    return messages.map(msg => {
-      switch (msg.role) {
-        case 'user':
-          return new HumanMessage(msg.content);
-        case 'assistant':
-          return new AIMessage(msg.content);
-        case 'system':
-          return new SystemMessage(msg.content);
-        default:
-          return new HumanMessage(msg.content);
-      }
-    });
-  }
-
-  async chat(request: ChatRequest): Promise<ChatResponse> {
+  private async retrieveContext(query: string, limit: number = 3): Promise<string> {
     try {
-      const langChainMessages = this.mapToLangChainMessages(request.messages);
+      const results = await this.chromaService.search(query, limit);
       
-      const agent = request.model?.includes('reasoner') ? this.r1Agent : this.agent;
-      
-      if (!agent) {
-        throw new Error('Agent not found');
+      if (results.length === 0) {
+        return '';
       }
 
-      if (request.model && request.model !== 'deepseek-chat' && request.model !== 'deepseek-reasoner') {
-        agent.updateSystemPrompt(`You are using model: ${request.model}. ${agent.getSystemPrompt()}`);
-      }
+      const contextParts = results.map((result, index) => {
+        return `[Document ${index + 1}]\n${result.document.content}`;
+      });
 
-      const response = await agent.chat(langChainMessages);
-
-      return {
-        id: `chatcmpl-${Date.now()}`,
-        object: 'chat.completion',
-        created: Math.floor(Date.now() / 1000),
-        model: request.model || 'deepseek-chat',
-        choices: [
-          {
-            index: 0,
-            message: {
-              role: 'assistant',
-              content: response.content,
-            },
-            finishReason: 'stop',
-          },
-        ],
-      };
+      return contextParts.join('\n\n---\n\n');
     } catch (error) {
-      console.error('LLM Service error:', error);
-      throw new Error(`LLM service error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Failed to retrieve context from ChromaDB:', error);
+      return '';
     }
+  }
+
+  private buildRagPrompt(userMessage: string, context: string): string {
+    if (!context) {
+      return userMessage;
+    }
+
+    return `Context information from documents:\n${context}\n\n---\n\nBased on the context above, please answer the following question. If the context doesn't contain relevant information, say "I don't have enough information in your documents to answer this question."\n\nQuestion: ${userMessage}`;
   }
 
   async *streamChat(request: ChatRequest): AsyncGenerator<string> {
     try {
-      const agent = request.model?.includes('reasoner') ? this.r1Agent : this.agent;
+      let userMessage = request.messages[request.messages.length - 1]!.content;
 
-      if (!agent) {
-        throw new Error('Agent not found');
+      if (request.useRag) {
+        const context = await this.retrieveContext(userMessage, request.ragLimit || 3);
+        userMessage = this.buildRagPrompt(userMessage, context);
       }
 
       let fullResponse = '';
       
-      await agent.stream(
-        request.messages[request.messages.length - 1]!.content,
-        (token) => {
+      await this.agent.stream(
+        userMessage,
+        (token: string) => {
           fullResponse += token;
         }
       );

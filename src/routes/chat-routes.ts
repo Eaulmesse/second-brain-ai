@@ -1,29 +1,14 @@
 import { FastifyInstance } from 'fastify';
 import { LLMService } from '../services/llm-service.js';
-import { ChatRequestSchema, ChatResponseSchema, ErrorResponseSchema, ChatRequest } from '../types/chat.js';
+import { ChromaService } from '../services/chroma-service.js';
+import { ChatRequestSchema, ChatRequest } from '../types/chat.js';
 import { asyncHandler } from '../middleware/async-handler.js';
 
 export async function chatRoutes(fastify: FastifyInstance) {
-  const llmService = new LLMService(process.env['DEEPSEEK_API_KEY'] || '');
+  const chromaService = new ChromaService();
+  const llmService = new LLMService(process.env['DEEPSEEK_API_KEY'] || '', chromaService);
 
   fastify.post('/api/chat', {
-    schema: {
-      body: ChatRequestSchema,
-      response: {
-        200: ChatResponseSchema,
-        400: ErrorResponseSchema,
-        500: ErrorResponseSchema,
-      },
-    },
-  }, asyncHandler(async (request, reply) => {
-    const chatRequest = request.body as ChatRequest;
-    
-    const response = await llmService.chat(chatRequest);
-    
-    return reply.code(200).send(response);
-  }));
-
-  fastify.post('/api/chat/stream', {
     schema: {
       body: ChatRequestSchema,
     },
