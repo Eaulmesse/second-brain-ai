@@ -1,96 +1,84 @@
-# Fastify TypeScript API
+# Second Brain
 
-API Fastify avec TypeScript, Docker et Docker Compose.
+An intelligent API that transforms your documents into a contextual conversational assistant using RAG (Retrieval Augmented Generation).
 
-## Fonctionnalités
+## Overview
 
-- Fastify avec TypeScript
-- TypeBox pour la validation de schéma
-- Multi-stage Docker build
-- Docker Compose pour développement et production
-- Health check automatique
-- Hot reload en développement
+Second Brain is an application that allows you to:
+- **Upload and index** your documents (PDF, DOCX, TXT, MD)
+- **Chat with your documents** via an intelligent LLM-powered chat
+- **Perform semantic search** across your knowledge base
+- **Get contextual answers** based on your own documents
 
-## Prérequis
+## Technologies
 
-- Node.js 22+
-- Docker et Docker Compose
-- npm ou yarn
+### Backend
+- **Fastify** - Fast and lightweight web framework for Node.js
+- **TypeScript** - Typed language for robust and maintainable code
 
-## Installation
+### Artificial Intelligence
+- **LangChain** - Framework for building LLM applications
+- **DeepSeek/OpenAI** - Language models for chat and embeddings
+- **ChromaDB** - Vector database for semantic search
 
-```bash
-npm install
-```
+### Document Processing
+- **pdf-parse** - Text extraction from PDFs
+- **mammoth** - DOCX document conversion
 
-## Développement
+### Infrastructure
+- **Docker** - Application containerization
+- **Docker Compose** - Multi-service orchestration (API + ChromaDB)
 
-```bash
-npm run dev
-```
+### Testing
+- **Vitest** - Fast testing framework for TypeScript
+- **@testing-library/react** - Testing utilities for React components
 
-Le serveur démarre sur `http://localhost:3000`
+## Features
 
-## Build
+- **Document upload** with automatic parsing
+- **Document vectorization** for semantic search
+- **Contextual chat** with streaming responses
+- **Semantic search** across the document database
+- **Health checks** for monitoring
+- **Hot reload** in development
 
-```bash
-npm run build
-```
+## Quick Start
 
-## Production
+See [SETUP.md](./SETUP.md) for detailed installation and configuration instructions.
 
-```bash
-npm start
-```
+## API Endpoints
 
-## Docker
+### Chat
+- `POST /api/chat` - Send a message and get a response
+- `POST /api/chat/stream` - Stream responses in real-time
+- `GET /api/chat/health` - Check LLM service status
 
-### Développement avec Docker
+### Documents
+- `POST /api/documents` - Upload a new document
+- `GET /api/documents` - List all indexed documents
+- `GET /api/documents/:id` - Retrieve a specific document
+- `DELETE /api/documents/:id` - Delete a document
+- `POST /api/documents/search` - Semantic search
 
-```bash
-docker-compose up app-dev
-```
+### Health
+- `GET /health` - General application health check
 
-### Production avec Docker
-
-```bash
-docker-compose up app
-```
-
-### Build l'image Docker
-
-```bash
-docker build -t votre-nom/second-brain-fastify .
-```
-
-### Push vers Docker Hub
-
-```bash
-docker tag votre-nom/second-brain-fastify votre-nom/second-brain-fastify:latest
-docker push votre-nom/second-brain-fastify:latest
-```
-
-## Endpoints
-
-- `GET /` - Message de bienvenue
-- `GET /health` - Health check
-
-## Structure du projet
+## Architecture
 
 ```
-src/
-  server.ts          # Serveur principal
-Dockerfile           # Build production
-Dockerfile.dev       # Build développement
-docker-compose.yml   # Configuration Docker Compose
-tsconfig.json        # Configuration TypeScript
-package.json         # Dépendances et scripts
+second_brain/
+├── src/
+│   ├── agents/         # LangChain agents for RAG
+│   ├── middleware/     # Fastify middleware (errors, async)
+│   ├── routes/         # API routes (chat, documents)
+│   ├── services/       # Business services (LLM, ChromaDB)
+│   ├── types/          # TypeScript types
+│   └── utils/          # Utilities
+├── docker-compose.yml  # Docker configuration
+├── Dockerfile          # Production image
+├── Dockerfile.dev      # Development image
+└── package.json        # Dependencies
 ```
-
-## Variables d'environnement
-
-- `NODE_ENV` - Environnement (development/production)
-- `PORT` - Port d'écoute (défaut: 3000)
 
 ## License
 
